@@ -51,10 +51,10 @@ rid int unsigned auto_increment,
 cid int unsigned not null,
 bid int unsigned not null,
 borrow date,
-return date,
+back date,
 primary key(rid),
-foreign key(cid) references cards(cid) ON DELETE CASCADE,
-foreign key(bid) references books(bid) ON DELETE CASCADE
+foreign key(cid) references cards(cid) on delete cascade ,
+foreign key(bid) references books(bid) on delete cascade 
 ) default CHARSET=utf8;";
                 cmd = new MySqlCommand(sql, conn);
                 cmd.ExecuteNonQuery();
@@ -125,7 +125,7 @@ foreign key(bid) references books(bid) ON DELETE CASCADE
 
                 var curIDsql = "select max(cid) from cards;";
                 var curIDCmd = new MySqlCommand(curIDsql, conn);
-                using MySqlDataReader rdr = cmd.ExecuteReader();
+                using MySqlDataReader rdr = curIDCmd.ExecuteReader();
 
                 while (rdr.Read())
                 {
@@ -182,28 +182,109 @@ foreign key(bid) references books(bid) ON DELETE CASCADE
                 conn.Open();
 
                 string query = "";
+                bool firstQ = false;
 
                 if (q.Class != null)
-                    query += "books.class=" + q.Class;
-                if (q.Title != null)
-                    query += "books.title=" + q.Title;
-                if (q.Publish != null)
-                    query += "books.publish=" + q.Publish;
-                if (q.Pubyear.Item1 != -1)
-                    query += "books.pubyear>=" + q.Pubyear.Item1.ToString();
-                if (q.Pubyear.Item2 != 3000)
-                    query += "books.pubyear<=" + q.Pubyear.Item2.ToString();
-                if (q.Author != null)
-                    query += "books.author=" + q.Author;
-                if (q.Price.Item1 != -1)
-                    query += "books.pubyear>=" + q.Price.Item1.ToString();
-                if (q.Price.Item2 != 3000)
-                    query += "books.pubyear<=" + q.Price.Item2.ToString();
+                {
+                    query += "books.class='" + q.Class + "'";
+                    firstQ = true;
+                }
 
-                var sql = @"select * from books where @QUERY;";
+                if (q.Title != null)
+                {
+                    if (firstQ) 
+                        query += " and books.title='" + q.Title + "'";
+                    else
+                    {
+                        query += "books.title='" + q.Title + "'";
+                        firstQ = true;
+                    }
+                }
+
+                if (q.Publish != null)
+                {
+                    if (firstQ)
+                    {
+                        query += " and books.publish='" + q.Publish + "'";
+                    }
+                    else
+                    {
+                        query += "books.publish='" + q.Publish + "'";
+                        firstQ = true;
+                    }
+                }
+
+                if (q.Pubyear.Item1 != -1)
+                {
+                    if (firstQ)
+                    {
+                        query += " and books.pubyear>=" + q.Pubyear.Item1.ToString();
+                    }
+                    else
+                    {
+                        query += "books.pubyear>=" + q.Pubyear.Item1.ToString();
+                        firstQ = true;
+                    }
+                }
+
+                if (q.Pubyear.Item2 != 3000)
+                {
+                    if (firstQ)
+                    {
+                        query += " and books.pubyear<=" + q.Pubyear.Item2.ToString();
+                    }
+                    else
+                    {
+                        query += "books.pubyear<=" + q.Pubyear.Item2.ToString();
+                        firstQ = true;
+                    }
+                }
+
+                if (q.Author != null)
+                {
+                    if (firstQ)
+                    {
+                        query += " and books.author='" + q.Author + "'";
+                    }
+                    else
+                    {
+                        query += "books.author='" + q.Author + "'";
+                        firstQ = true;
+                    }
+                }
+
+                if (q.Price.Item1 > -1)
+                {
+                    if (firstQ)
+                    {
+                        query += " and books.pubyear>=" + q.Price.Item1.ToString();
+                    }
+                    else
+                    {
+                        query += "books.pubyear>=" + q.Price.Item1.ToString();
+                        firstQ = true;
+                    }
+                }
+
+                if (q.Price.Item2 < 3000)
+                {
+                    if (firstQ)
+                    {
+                        query += " and books.price<=" + q.Price.Item2.ToString();
+                    }
+                    else
+                    {
+                        query += "books.price<=" + q.Price.Item2.ToString();
+                    }
+                }
+
+                var sql = @"select * from books where " + query + ";";
                 using var cmd = new MySqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("@QUERY", query);
+                // cmd.Parameters.AddWithValue("@QUERY", query);
                 using MySqlDataReader rdr = cmd.ExecuteReader();
+                
+                Console.WriteLine(sql);
+                Console.WriteLine(query);
 
                 
                 while (rdr.Read())
@@ -357,7 +438,7 @@ where books.bid=@ID;";
             {
                 conn.Open();
 
-                var sql = @"select min(records.return)
+                var sql = @"select min(records.back)
 from records 
 where records.bid=@ID;";
                 using var cmd = new MySqlCommand(sql, conn);
@@ -426,7 +507,7 @@ where records.bid=@BID and records.cid=@CID;";
             {
                 conn.Open();
 
-                var sql = @"insert into records (cid, bid, borrow, return) values (@CID, @BID, CURDATE(), CURDATE() + 30);";
+                var sql = @"insert into records (cid, bid, borrow, back) values (@CID, @BID, CURDATE(), date_add(CURDATE(), interval 1 MONTH) );";
                 using var cmd = new MySqlCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@BID", bid.ToString());
                 cmd.Parameters.AddWithValue("@CID", cid.ToString());

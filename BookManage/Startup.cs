@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BookManage.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -26,6 +27,8 @@ namespace BookManage
             
             services.AddSingleton<ISqlService>(s =>
                 new SqlService("server=127.0.0.1;user=root;database=bookManagement;port=3306;password=123456"));
+            services.AddSingleton<BookManagementService>();
+            // services.AddRazorPages();
             services.AddControllers();
         }
 

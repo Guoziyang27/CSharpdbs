@@ -54,6 +54,7 @@ namespace BookManage.Controller
                 Class = data.Class,
                 Author = data.Author,
                 Publish = data.Publish,
+                Title = data.Title,
                 Pubyear = new Tuple<int, int>(data.PubyearLower, data.PubyearUpper),
                 Price = new Tuple<double, double>(data.PriceLower, data.PriceUpper)
             };
@@ -115,8 +116,8 @@ namespace BookManage.Controller
                 Company = c.Company,
                 Class = c.Class
             };
-            var cardID = _service.AddCard(p);
-            return Ok(ApiResponse.Success(new {ID = cardID}));
+            var cardId = _service.AddCard(p);
+            return Ok(ApiResponse.Success(new {ID = cardId}));
         }
         
         [HttpPost("del/card/{id}")]
