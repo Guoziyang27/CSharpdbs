@@ -1,9 +1,14 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using BookManage.Models;
 using BookManage.Services;
 using Google.Protobuf.WellKnownTypes;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BookManage.Controller
@@ -15,6 +20,44 @@ namespace BookManage.Controller
 
         public BookController(BookManagementService service) => _service = service;
 
+        [HttpPost("authenticate")]
+        public async Task<IActionResult> Login([FromBody] AuthenticateReqDto body)
+        {
+            var result = _service.GetPersonInfo(Int32.Parse(body.CardId));
+            if (result.Password == body.Password)
+            {
+                var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
+                identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, body.CardId));
+                var principal = new ClaimsPrincipal(identity);
+                await HttpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    principal,
+                    new AuthenticationProperties
+                    {
+                        IsPersistent = false
+                    });
+                return Ok(ApiResponse.Success(new
+                {
+                    info = "Login successfully"
+                }));
+            }
+
+            return Unauthorized();
+        }
+
+        [HttpPut("authenticate")]
+        public async Task<IActionResult> Logout()
+        {
+            var id = Int32.Parse(HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            
+            await HttpContext.SignOutAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme);
+            return Ok(ApiResponse.Success(new
+            {
+                info = "Logout successfully"
+            }));
+        }
+
         [HttpPost("init/database")]
         public IActionResult InitDatabase()
         {
@@ -24,7 +67,7 @@ namespace BookManage.Controller
             }));
         }
 
-        [HttpPost("add/books")]
+        [HttpPost("books")]
         public IActionResult AddBooks([FromBody] BookReqDto data)
         {
             if (data == null)
@@ -41,14 +84,15 @@ namespace BookManage.Controller
                 Stock = data.Number
             };
             var result = _service.AddBook(books);
-            return Ok(ApiResponse.Success(new {id = result}));
+            return Ok(ApiResponse.Success(new {data = result}));
         }
 
-        [HttpGet("get/books")]
-        public IActionResult QueryBooks([FromQuery] BookQueryReqDto data)
+        [HttpGet("books")]
+        public IActionResult QueryBooks([FromQuery] BookQueryReqDto body)
         {
-            if (data == null)
+            if (body == null)
                 return Ok(ApiResponse.Error("ERROR_PARAMETER"));
+            BookQueryReqDto data = body;
             var query = new Query()
             {
                 Class = data.Class,
@@ -59,29 +103,40 @@ namespace BookManage.Controller
                 Price = new Tuple<double, double>(data.PriceLower, data.PriceUpper)
             };
 
-            var result = _service.GetBook(query);
-
-            return Ok(ApiResponse.Success(new {list = result}));
+            List<Book> result = _service.GetBook(query);
+            
+            return Ok(ApiResponse.Success(new {data = result}));
         }
 
-        [HttpGet("get/person/{id}")]
-        public IActionResult GetPerson([FromRoute] int id)
+        [HttpGet("books/{id}")]
+        public IActionResult QueryOneBook([FromRoute] int id)
         {
+            var result = _service.GetBook(id);
+
+            return Ok(ApiResponse.Success(new {data = result}));
+        }
+
+        [HttpGet("person_info")]
+        public IActionResult GetPerson()
+        {
+            var id = Int32.Parse(HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var result = _service.GetPersonInfo(id);
             return result.id != -1 ? Ok(ApiResponse.Success(result)) :
                 Ok(ApiResponse.Error("PERSON_NOT_FOUND"));
         }
         
-        [HttpGet("get/borrowed/{id}")]
-        public IActionResult GetBorrowed([FromRoute] int id)
+        [HttpGet("paerson_borrowed")]
+        public IActionResult GetBorrowed()
         {
+            var id = Int32.Parse(HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var result = _service.GetBorrowed(id);
             return Ok(ApiResponse.Success(result));
         }
         
-        [HttpPost("borrow/{cid}/{bid}")]
-        public IActionResult Borrow([FromRoute] int cid, [FromRoute] int bid)
+        [HttpPost("borrow/{bid}")]
+        public IActionResult Borrow([FromRoute] int bid)
         {
+            var cid = Int32.Parse(HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var isEmpty = _service.IsEmpty(bid);
             if (isEmpty)
             {
@@ -93,37 +148,42 @@ namespace BookManage.Controller
             
             return Ok(ApiResponse.Success(new {info = result}));
         }
-        [HttpPost("return/{cid}/{bid}")]
-        public IActionResult Return([FromRoute] int cid, [FromRoute] int bid)
+        [HttpPost("return/{bid}")]
+        public IActionResult Return([FromRoute] int bid)
         {
-            var BorrowedID = _service.IsBorrowed(bid, cid);
-            if (BorrowedID == -1)
+            var cid = Int32.Parse(HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            var borrowedId = _service.IsBorrowed(bid, cid);
+            if (borrowedId == -1)
             {
                 return Ok(ApiResponse.Success(new {info = "This card didn't borrow this book"}));
             }
 
-            var result = _service.Return(BorrowedID);
+            var result = _service.Return(borrowedId);
             
             return Ok(ApiResponse.Success(new {info = result}));
         }
 
-        [HttpPost("add/card")]
+        [HttpPost("register")]
         public IActionResult AddCard([FromBody] CardReqDto c)
         {
             Person p = new Person()
             {
                 Name = c.Name,
                 Company = c.Company,
+                Password = c.Password,
                 Class = c.Class
             };
             var cardId = _service.AddCard(p);
             return Ok(ApiResponse.Success(new {ID = cardId}));
         }
         
-        [HttpPost("del/card/{id}")]
-        public IActionResult DelCard([FromRoute] int id)
+        [HttpPut("register")]
+        public async Task<IActionResult> DelCard()
         {
+            var id = Int32.Parse(HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var result = _service.DelCard(id);
+            await HttpContext.SignOutAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme);
             return Ok(ApiResponse.Success(new {info = result}));
         }
     }

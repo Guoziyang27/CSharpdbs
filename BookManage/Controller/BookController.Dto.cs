@@ -3,6 +3,30 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BookManage.Controller
 {
+    public class AuthenticateReqDto
+    {
+        [Required] [StringLength(20)] public string CardId { get; set; }
+        [Required] [StringLength(20)] public string Password { get; set; }
+    }
+    public class BookGetListReqDto
+    {
+        public SortReqDto Sort { get; set; }
+        public RangeReqDto Range { get; set; }
+        [Required] public BookQueryReqDto Filter { get; set; }
+    }
+
+    public class SortReqDto
+    {
+        [Required] [StringLength(20)] public string Field { get; set; }
+        [Required] [StringLength(20)] public string Order { get; set; }
+    }
+    
+    public class RangeReqDto
+    {
+        [Required] [StringLength(20)] public int Lower { get; set; }
+        [Required] [StringLength(20)] public int Upper { get; set; }
+    }
+    
     public class BookReqDto
     {
         [Required]
@@ -55,6 +79,9 @@ namespace BookManage.Controller
         [Required]
         [StringLength(20)]
         public string Name { get; set; }
+        [Required]
+        [StringLength(20)]
+        public string Password { get; set; }
         [Required]
         [StringLength(20)]
         public string Company { get; set; }

@@ -68,6 +68,9 @@ namespace  BookManage.Models
         
         [StringLength(20)]
         public string Class { get; set; }
+        
+        [StringLength(20)]
+        public string Password { get; set; }
 
         public Person()
         {

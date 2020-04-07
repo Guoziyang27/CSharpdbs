@@ -42,6 +42,7 @@ cid int unsigned auto_increment,
 name varchar(20) not null,
 company varchar(20),
 class varchar(20) not null,
+password varchar(20) not null,
 primary key(cid)
 ) default CHARSET=utf8;";
                 cmd = new MySqlCommand(sql, conn);
@@ -72,7 +73,7 @@ foreign key(bid) references books(bid) on delete cascade
             return "Initialize Database";
         }
 
-        public string AddBook(Book book)
+        public Book AddBook(Book book)
         {
             var conn = _sqlService.GetConnection();
             try
@@ -92,6 +93,14 @@ foreign key(bid) references books(bid) on delete cascade
                 cmd.Parameters.AddWithValue("@STOCK", book.Stock);
 
                 cmd.ExecuteNonQuery();
+                var curIDsql = "select max(bid) from books;";
+                var curIDCmd = new MySqlCommand(curIDsql, conn);
+                using MySqlDataReader rdr = curIDCmd.ExecuteReader();
+
+                while (rdr.Read())
+                {
+                    book.id = rdr.GetInt32(0);
+                }
             }
             catch (Exception e)
             {
@@ -103,7 +112,7 @@ foreign key(bid) references books(bid) on delete cascade
                 conn.Close();
             }
 
-            return "Add new books into database";
+            return book;
         }
 
         public int AddCard(Person p)
@@ -113,13 +122,14 @@ foreign key(bid) references books(bid) on delete cascade
             try
             {
                 conn.Open();
-                var sql = @"insert into cards (name, company, class)
-                values (@NAME, @COMPANY, @CLASS);";
+                var sql = @"insert into cards (name, company, class, password)
+                values (@NAME, @COMPANY, @CLASS, @PASSWORD);";
                 var cmd = new MySqlCommand(sql, conn);
 
                 cmd.Parameters.AddWithValue("@CLASS", p.Class);
                 cmd.Parameters.AddWithValue("@NAME", p.Name);
                 cmd.Parameters.AddWithValue("@COMPANY", p.Company);
+                cmd.Parameters.AddWithValue("@PASSWORD", p.Password);
 
                 cmd.ExecuteNonQuery();
 
@@ -313,6 +323,45 @@ foreign key(bid) references books(bid) on delete cascade
 
             return ans;
         }
+        public Book GetBook(int bid)
+        {
+            var conn = _sqlService.GetConnection();
+            Book ans = new Book();
+            try
+            {
+                conn.Open();
+
+                var sql = @"select * from books where bid=@ID;";
+                using var cmd = new MySqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@ID", bid);
+                using MySqlDataReader rdr = cmd.ExecuteReader();
+
+                while (rdr.Read())
+                {
+                    ans = new Book(
+                        rdr.GetString(1), 
+                        rdr.GetString(2), 
+                        rdr.GetString(3),
+                        rdr.GetInt32(4),
+                        rdr.GetString(5),
+                        rdr.GetDouble(6),
+                        rdr.GetInt32(7),
+                        rdr.GetInt32(8));
+                    ans.id = rdr.GetInt32(0);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+            finally
+            {
+                conn.Close();
+            }
+
+            return ans;
+        }
 
         public List<Book> GetBorrowed(int cid)
         {
@@ -381,6 +430,7 @@ where cards.cid=@ID;";
                     ans.Name = rdr.GetString(1);
                     ans.Company = rdr.GetString(2);
                     ans.Class = rdr.GetString(3);
+                    ans.Password = rdr.GetString(4);
                 }
             }
             catch (Exception e)
